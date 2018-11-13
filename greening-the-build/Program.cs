@@ -64,6 +64,26 @@ namespace greeningthebuild
             return (JArray)client.SendGet("get_suites/" + projectID);
         }
 
+		public static JArray GetRuns(APIClient client, string projectID)
+        {
+            return (JArray)client.SendGet("get_runs/" + projectID);
+        }
+
+		public static JArray GetTestsInRun(APIClient client, string runID)
+        {
+            return (JArray)client.SendGet("get_tests/" + runID);
+        }
+
+		public static JArray GetLatestResultsOfTest(APIClient client, string testID, string amountOfResultsToShow)
+        {
+            return (JArray)client.SendGet("get_results/" + testID + "&limit=" + amountOfResultsToShow);
+        }
+
+		public static JArray GetLatestResultsForCase(APIClient client, string runID, string caseID, string amountOfResultsToShow)
+        {
+            return (JArray)client.SendGet("get_results_for_case/" + runID + "/" + caseID + "&limit=" + amountOfResultsToShow);
+        }
+
 
 		public static List<Case> CreateListOfCases(APIClient client, JArray casesArray, List<Case> listOfCases, string suiteID, string suiteName, string milestoneName)
         {
