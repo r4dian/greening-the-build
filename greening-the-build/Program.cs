@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Gurock.TestRail;
 using System.Text;
+using System.IO;
 
 namespace greeningthebuild
 {
@@ -14,14 +15,12 @@ namespace greeningthebuild
         {
             public string SuiteID;
             public string SuiteName;
-            public string CreatedOn;
-            public string UpdatedOn;
-            public int CaseID;
+            public string CaseID;
             public string CaseName;
             public string MilestoneName;
-			public string MostRecentTestID;
-			public string EditorVersion;
-			public string Result;
+			//public string MostRecentTestID;
+			//public string EditorVersion;
+			//public string Result;
         }
 
 
@@ -30,7 +29,9 @@ namespace greeningthebuild
             Console.WriteLine("Hello World!");
 			APIClient client = ConnectToTestrail();
 
-			JArray suitesArray = GetSuitesInProject(client, projectID);
+			JArray suitesArray = GetSuitesInProject(client, args[0]);
+
+			List<Case> cases = new List<Case>();
 
 			for (int i = 0; i < suitesArray.Count; i++)
 			{
@@ -38,22 +39,54 @@ namespace greeningthebuild
 				string suiteId = arrayObject.Property("id").Value.ToString();
 				string suiteName = arrayObject.Property("name").Value.ToString();
 
-				JArray casesArray = GetCasesInSuite(client, projectID, suiteId);
+				JArray casesArray = GetCasesInSuite(client, args[0], suiteId);
 
-				List<Case> cases = new List<Case>();
 
-				cases = CreateListOfCases(client, casesArray, cases, suiteId, suiteName, milestoneName);
+
+				JObject projectObject = GetProject(client, args[0]);
+
+				string projectName = projectObject.Property("name").Value.ToString();
+
+				string milestoneString = "";
+                if (projectName.Contains("Unity "))
+                {
+                    milestoneString = projectName.Remove(0, 6);
+                }
+
+				cases = CreateListOfCases(client, casesArray, cases, suiteId, suiteName, milestoneString);
 			}
+
+			string csv = CreateCsvOfCases(cases);
+
+			File.WriteAllText("Cases.csv", csv.ToString());
         }
 
 		private static APIClient ConnectToTestrail()
         {
-            APIClient client = new APIClient("http://qatestrail.hq.unity3d.com");
+            APIClient client = new APIClient("https://qatestrail.hq.unity3d.com");
 			client.User = "";
 			client.Password = ""; //API key
             return client;
         }
 
+		private static string CreateCsvOfCases(List<Case> listOfCases)
+        {
+            StringBuilder csv = new StringBuilder();
+
+			string header = string.Format("{0},{1},{2},{3},{4},{5}", "Suite ID", "Suite Name", "Case ID", "Title", "Milestone Name", "\n");
+            csv.Append(header);
+
+			for (int i = 0; i < listOfCases.Count; i++)
+            {
+				Case caseObject = listOfCases[i];
+                
+				string newLine = string.Format("{0},{1},{2},{3},{4},{5}", caseObject.SuiteID, caseObject.SuiteName, caseObject.CaseID, caseObject.CaseName, caseObject.MilestoneName, "\n");
+                csv.Append(newLine);
+            }
+
+            return csv.ToString();
+        }
+        
 		public static JArray GetCasesInSuite(APIClient client, string projectID, string suiteID)
         {
             return (JArray)client.SendGet("get_cases/" + projectID + "&suite_id=" + suiteID);
@@ -84,6 +117,11 @@ namespace greeningthebuild
             return (JArray)client.SendGet("get_results_for_case/" + runID + "/" + caseID + "&limit=" + amountOfResultsToShow);
         }
 
+		public static JObject GetProject(APIClient client, string projectID)
+        {
+            return (JObject)client.SendGet("get_project/" + projectID);
+        }
+
 
 		public static List<Case> CreateListOfCases(APIClient client, JArray casesArray, List<Case> listOfCases, string suiteID, string suiteName, string milestoneName)
         {
@@ -104,13 +142,11 @@ namespace greeningthebuild
                 Case newCase;
                 newCase.SuiteID = suiteID;
                 newCase.SuiteName = suiteName;
-                newCase.CreatedOn = createdOn;
-                newCase.UpdatedOn = updatedOn;
-                newCase.CaseID = Int32.Parse(caseID);
+				newCase.CaseID = caseID;
                 newCase.CaseName = caseName;
                 newCase.MilestoneName = milestoneName;
 
-                //.Add(newCase);
+				listOfCases.Add(newCase);
             }
             return listOfCases;
         }
