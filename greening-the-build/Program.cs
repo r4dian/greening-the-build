@@ -5,6 +5,8 @@ using Newtonsoft.Json.Linq;
 using Gurock.TestRail;
 using System.Text;
 using System.IO;
+using System.Globalization;
+using System.Linq;
 
 namespace greeningthebuild
 {
@@ -18,10 +20,10 @@ namespace greeningthebuild
             public string CaseID;
             public string CaseName;
             public string MilestoneName;
-			//public string MostRecentRunID;
+			public string MostRecentRunID;
 			public string MostRecentTestID;
-			//public string EditorVersion;
-			//public string Result;
+			public string EditorVersion;
+			public string Result;
         }
 
         public struct Run
@@ -36,9 +38,12 @@ namespace greeningthebuild
 			public string TestID;
 			public string RunID;
 			public string CaseID;
+			public string Result;
+			public int CompletedOn;
+			public string EditorVersion;
 		}
 
-		public static List<Run> runs;
+		public static List<Run> runs = new List<Run>();
 
 
         public static void Main(string[] args)
@@ -50,29 +55,6 @@ namespace greeningthebuild
 
 			List<Case> cases = new List<Case>();
 
-			for (int i = 0; i < suitesArray.Count; i++)
-			{
-				JObject arrayObject = suitesArray[i].ToObject<JObject>();
-				string suiteId = arrayObject.Property("id").Value.ToString();
-				string suiteName = arrayObject.Property("name").Value.ToString();
-
-				JArray casesArray = GetCasesInSuite(client, args[0], suiteId);
-
-
-
-				JObject projectObject = GetProject(client, args[0]);
-
-				string projectName = projectObject.Property("name").Value.ToString();
-
-				string milestoneString = "";
-                if (projectName.Contains("Unity "))
-                {
-                    milestoneString = projectName.Remove(0, 6);
-                }
-
-				cases = CreateListOfCases(casesArray, suiteId, suiteName, milestoneString);
-			}
-
 			JArray runsArray = GetRuns(client, args[0]);
 
 			JArray plansArray = GetPlans(client, args[0]);
@@ -81,16 +63,38 @@ namespace greeningthebuild
 
 			GetRunsInPlan(plansArray, client, runs);
 
+			JObject projectObject = GetProject(client, args[0]);
+
+            string projectName = projectObject.Property("name").Value.ToString();
+
 			List<Test> tests = new List<Test>();
 			foreach (Run run in runs)
 			{
 				List<Test> currentTests = new List<Test>();
 
 				JArray testsArray = GetTestsInRun(client, run.RunID);
-				currentTests = CreateListOfTests(testsArray);
+				currentTests = CreateListOfTests(client, testsArray);
 
 				tests.AddRange(currentTests);
 			}
+
+			for (int i = 0; i < suitesArray.Count; i++)
+            {
+                JObject arrayObject = suitesArray[i].ToObject<JObject>();
+                string suiteId = arrayObject.Property("id").Value.ToString();
+                string suiteName = arrayObject.Property("name").Value.ToString();
+
+                JArray casesArray = GetCasesInSuite(client, args[0], suiteId);            
+
+                string milestoneString = "";
+                if (projectName.Contains("Unity "))
+                {
+                    milestoneString = projectName.Remove(0, 6);
+                }
+
+				List<Case> casesInSuite = CreateListOfCases(casesArray, suiteId, suiteName, milestoneString, tests);
+				cases.AddRange(casesInSuite);
+            }
 
 			string csv = CreateCsvOfCases(cases);
 
@@ -101,7 +105,7 @@ namespace greeningthebuild
         {
             APIClient client = new APIClient("https://qatestrail.hq.unity3d.com");
 			client.User = "";
-			client.Password = ""; //API key
+			client.Password = "" //API key
             return client;
         }
 
@@ -109,14 +113,14 @@ namespace greeningthebuild
         {
             StringBuilder csv = new StringBuilder();
 
-			string header = string.Format("{0},{1},{2},{3},{4},{5}", "Suite ID", "Suite Name", "Case ID", "Title", "Milestone Name", "\n");
+			string header = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}", "Suite ID", "Suite Name", "Case ID", "Title", "Milestone Name", "Run ID", "Test ID", "Editor Version", "Result", "\n");
             csv.Append(header);
 
 			for (int i = 0; i < listOfCases.Count; i++)
             {
 				Case caseObject = listOfCases[i];
                 
-				string newLine = string.Format("{0},{1},{2},{3},{4},{5}", caseObject.SuiteID, caseObject.SuiteName, caseObject.CaseID, caseObject.CaseName, caseObject.MilestoneName, "\n");
+				string newLine = string.Format("{0},{1},{2},{3},{4},{5,{6},{7},{8},{9}", caseObject.SuiteID, "\""+ caseObject.SuiteName +"\"", caseObject.CaseID, "\"" + caseObject.CaseName + "\"", caseObject.MilestoneName, caseObject.MostRecentRunID, caseObject.MostRecentTestID, caseObject.EditorVersion, caseObject.Result, "\n");
                 csv.Append(newLine);
             }
 
@@ -163,15 +167,23 @@ namespace greeningthebuild
             return (JObject)client.SendGet("get_project/" + projectID);
         }
 
+		public static JArray GetResultsFields(APIClient client)
+        {
+            return (JArray)client.SendGet("get_result_fields");
+        }
 
-		public static List<Case> CreateListOfCases(JArray casesArray, string suiteID, string suiteName, string milestoneName)
+		public static JArray GetStatuses(APIClient client)
+        {
+            return (JArray)client.SendGet("get_statuses");
+        }
+
+
+		public static List<Case> CreateListOfCases(JArray casesArray, string suiteID, string suiteName, string milestoneName, List<Test> tests)
         {
 			List<Case> listOfCases = new List<Case>();
             for (int i = 0; i < casesArray.Count; i++)
             {
                 JObject arrayObject = casesArray[i].ToObject<JObject>();
-
-                //allCaseIDs.Add(Int32.Parse(arrayObject.Property("id").Value.ToString()));
 
                 string caseID = arrayObject.Property("id").Value.ToString();
                 string caseName = arrayObject.Property("title").Value.ToString();
@@ -179,7 +191,25 @@ namespace greeningthebuild
                 string sectionID = arrayObject.Property("section_id").Value.ToString();
 
                 string createdOn = arrayObject.Property("created_on").Value.ToString();
-				string updatedOn = arrayObject.Property("updated_on").Value.ToString();        
+				string updatedOn = arrayObject.Property("updated_on").Value.ToString();
+
+                
+				List<Test> testsWithCaseID = tests.FindAll(x => x.CaseID == caseID);
+
+				Test recentTest;
+				if (testsWithCaseID.Count == 0)
+				{
+					continue;
+				}
+				else if (testsWithCaseID.Count == 1)
+				{
+					recentTest = testsWithCaseID[0];
+				}
+				else
+				{
+					// Find the test with the most recent date
+					recentTest = testsWithCaseID.Aggregate((i1, i2) => i1.CompletedOn > i2.CompletedOn ? i1 : i2);
+				}
 
                 Case newCase;
                 newCase.SuiteID = suiteID;
@@ -187,6 +217,10 @@ namespace greeningthebuild
 				newCase.CaseID = caseID;
                 newCase.CaseName = caseName;
                 newCase.MilestoneName = milestoneName;
+				newCase.MostRecentTestID = recentTest.TestID;
+				newCase.MostRecentRunID = recentTest.RunID;
+				newCase.Result = recentTest.Result;
+				newCase.EditorVersion = recentTest.EditorVersion;
 
 				listOfCases.Add(newCase);
             }
@@ -204,9 +238,6 @@ namespace greeningthebuild
                 JObject arrayObject = planArray[i].ToObject<JObject>();
 
                 string planID = arrayObject.Property("id").Value.ToString();
-                //planIds.Add(planID);
-
-                //string planName = arrayObject.Property("name").Value.ToString();
 
 				JObject singularPlanObject = (JObject)client.SendGet("get_plan/" + planID);
 
@@ -259,8 +290,10 @@ namespace greeningthebuild
 			}
 		}
 
-		public static List<Test> CreateListOfTests(JArray testsArray)
+		public static List<Test> CreateListOfTests(APIClient client, JArray testsArray)
 		{
+			JArray statusArray = GetStatuses(client);
+
 			List<Test> tests = new List<Test>();
 
 			for (int i = 0; i < testsArray.Count; i++)
@@ -271,10 +304,32 @@ namespace greeningthebuild
 				string caseID = arrayObject.Property("case_id").Value.ToString();
 				string runID = arrayObject.Property("run_id").Value.ToString();
 
+				string editorVersion = "";
+				int completedDate = 0;
+				string result = "";
+
+				JArray resultsOfLatestTest = GetLatestResultsOfTest(client, testID, "1");
+
+				if (resultsOfLatestTest.Count > 0)
+				{
+					for (int k = 0; k < resultsOfLatestTest.Count; k++)
+					{
+						JObject resultObject = resultsOfLatestTest[k].ToObject<JObject>();
+
+						editorVersion = resultObject.Property("custom_editorversion").Value.ToString();
+						completedDate = Int32.Parse(resultObject.Property("created_on").Value.ToString());
+						string resultID = resultObject.Property("status_id").Value.ToString();
+						result = GetStatus(statusArray, resultID);
+					}
+				}
+
 				Test test;
 				test.TestID = testID;
 				test.CaseID = caseID;
 				test.RunID = runID;
+				test.Result = result;
+				test.EditorVersion = editorVersion;
+				test.CompletedOn = completedDate;
 
 				tests.Add(test);
 			}
@@ -337,6 +392,33 @@ namespace greeningthebuild
                 }
             }
             return "";
+        }
+
+		public static string GetStatus(JArray statusArray, string rawValue)
+        {
+            string statusName = "";
+
+            for (int i = 0; i < statusArray.Count; i++)
+            {
+                JObject caseType = statusArray[i].ToObject<JObject>();
+
+                if (caseType.Property("id").Value.ToString() == rawValue)
+                {
+                    statusName = caseType.Property("name").Value.ToString();
+
+                    if (statusName == "untested")
+                    {
+                        statusName = "In Progress";
+                    }
+                    break;
+                }
+            }
+
+            TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
+
+            statusName = textInfo.ToTitleCase(statusName);
+
+            return statusName;
         }
     }
 }
