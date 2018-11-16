@@ -105,7 +105,7 @@ namespace greeningthebuild
         {
             APIClient client = new APIClient("https://qatestrail.hq.unity3d.com");
 			client.User = "";
-			client.Password = "" //API key
+			client.Password = ""; //API key
             return client;
         }
 
@@ -115,13 +115,14 @@ namespace greeningthebuild
 
 			string header = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}", "Suite ID", "Suite Name", "Case ID", "Title", "Milestone Name", "Run ID", "Test ID", "Editor Version", "Result", "\n");
             csv.Append(header);
-
+            
 			for (int i = 0; i < listOfCases.Count; i++)
             {
 				Case caseObject = listOfCases[i];
                 
-				string newLine = string.Format("{0},{1},{2},{3},{4},{5,{6},{7},{8},{9}", caseObject.SuiteID, "\""+ caseObject.SuiteName +"\"", caseObject.CaseID, "\"" + caseObject.CaseName + "\"", caseObject.MilestoneName, caseObject.MostRecentRunID, caseObject.MostRecentTestID, caseObject.EditorVersion, caseObject.Result, "\n");
-                csv.Append(newLine);
+				//string newLine = String.Format("{0},{1},{2},{3},{4},{5,{6},{7},{8},{9}", caseObject.SuiteID.ToString(), "\""+ caseObject.SuiteName.ToString() +"\"", caseObject.CaseID.ToString(), "\"" + caseObject.CaseName.ToString() + "\"", "\"" + caseObject.MilestoneName.ToString() + "\"", "\"" + caseObject.MostRecentRunID.ToString() + "\"", "\"" + caseObject.MostRecentTestID.ToString() + "\"", "\"" + caseObject.EditorVersion.ToString() + "\"", "\"" + caseObject.Result.ToString() + "\"", "\n");
+				string newLine = caseObject.SuiteID + "," + "\""+ caseObject.SuiteName +"\"" + ","+ caseObject.CaseID + ","+"\"" + caseObject.CaseName + "\"" + "," + caseObject.MilestoneName + "," + caseObject.MostRecentRunID + "," + caseObject.MostRecentTestID + "," + caseObject.EditorVersion + "," + caseObject.Result + ",\n";
+				csv.Append(newLine);
             }
 
             return csv.ToString();
