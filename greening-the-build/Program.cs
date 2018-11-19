@@ -103,7 +103,7 @@ namespace greeningthebuild
 
 			string csv = CreateCsvOfCases(cases, maxEditorVersion, args[0]);
 
-			File.WriteAllText("Cases.csv", csv.ToString());
+			File.WriteAllText("Cases"+args[0]+".csv", csv.ToString());
         }
 
 		private static APIClient ConnectToTestrail()
