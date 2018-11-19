@@ -204,6 +204,19 @@ namespace greeningthebuild
 				Test recentTest;
 				if (testsWithCaseID.Count == 0)
 				{
+					Case untestedCase;
+					untestedCase.SuiteID = suiteID;
+					untestedCase.SuiteName = suiteName;
+					untestedCase.CaseID = caseID;
+					untestedCase.CaseName = caseName;
+					untestedCase.MilestoneName = milestoneName;
+					untestedCase.MostRecentTestID = "0000";
+					untestedCase.MostRecentRunID = "0000";
+					untestedCase.Result = "Untested";
+					untestedCase.EditorVersion = "None";
+					untestedCase.RawEditorVersion = 00;
+
+					listOfCases.Add(untestedCase);
 					continue;
 				}
 				else if (testsWithCaseID.Count == 1)
