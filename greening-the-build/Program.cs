@@ -23,6 +23,7 @@ namespace greeningthebuild
 			public string MostRecentRunID;
 			public string MostRecentTestID;
 			public string EditorVersion;
+			public int RawEditorVersion;
 			public string Result;
         }
 
@@ -41,6 +42,7 @@ namespace greeningthebuild
 			public string Result;
 			public int CompletedOn;
 			public string EditorVersion;
+			public int RawEditorVersion;
 		}
 
 		public static List<Run> runs = new List<Run>();
@@ -73,7 +75,7 @@ namespace greeningthebuild
 				List<Test> currentTests = new List<Test>();
 
 				JArray testsArray = GetTestsInRun(client, run.RunID);
-				currentTests = CreateListOfTests(client, testsArray);
+				currentTests = CreateListOfTests(client, testsArray, args[0]);
 
 				tests.AddRange(currentTests);
 			}
@@ -96,7 +98,10 @@ namespace greeningthebuild
 				cases.AddRange(casesInSuite);
             }
 
-			string csv = CreateCsvOfCases(cases);
+			Case highestCase = cases.Aggregate((i1, i2) => i1.RawEditorVersion > i2.RawEditorVersion ? i1 : i2);
+			string maxEditorVersion = highestCase.EditorVersion;
+
+			string csv = CreateCsvOfCases(cases, maxEditorVersion, args[0]);
 
 			File.WriteAllText("Cases.csv", csv.ToString());
         }
@@ -109,19 +114,18 @@ namespace greeningthebuild
             return client;
         }
 
-		private static string CreateCsvOfCases(List<Case> listOfCases)
+		private static string CreateCsvOfCases(List<Case> listOfCases, string maxEditorVersion, string projectID)
         {
             StringBuilder csv = new StringBuilder();
 
-			string header = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}", "Suite ID", "Suite Name", "Case ID", "Title", "Milestone Name", "Run ID", "Test ID", "Editor Version", "Result", "\n");
+			string header = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}", "Identifier", "Suite ID", "Suite Name", "Case ID", "Title", "Milestone Name", "Run ID", "Test ID", "Editor Version", "Result", "Max Editor Version", "\n");
             csv.Append(header);
             
 			for (int i = 0; i < listOfCases.Count; i++)
             {
 				Case caseObject = listOfCases[i];
                 
-				//string newLine = String.Format("{0},{1},{2},{3},{4},{5,{6},{7},{8},{9}", caseObject.SuiteID.ToString(), "\""+ caseObject.SuiteName.ToString() +"\"", caseObject.CaseID.ToString(), "\"" + caseObject.CaseName.ToString() + "\"", "\"" + caseObject.MilestoneName.ToString() + "\"", "\"" + caseObject.MostRecentRunID.ToString() + "\"", "\"" + caseObject.MostRecentTestID.ToString() + "\"", "\"" + caseObject.EditorVersion.ToString() + "\"", "\"" + caseObject.Result.ToString() + "\"", "\n");
-				string newLine = caseObject.SuiteID + "," + "\""+ caseObject.SuiteName +"\"" + ","+ caseObject.CaseID + ","+"\"" + caseObject.CaseName + "\"" + "," + caseObject.MilestoneName + "," + caseObject.MostRecentRunID + "," + caseObject.MostRecentTestID + "," + caseObject.EditorVersion + "," + caseObject.Result + ",\n";
+				string newLine = caseObject.CaseID + "-" + projectID + "-" + maxEditorVersion +","+ caseObject.SuiteID + "," + "\""+ caseObject.SuiteName +"\"" + ","+ caseObject.CaseID + ","+"\"" + caseObject.CaseName + "\"" + "," + caseObject.MilestoneName + "," + caseObject.MostRecentRunID + "," + caseObject.MostRecentTestID + "," + caseObject.EditorVersion + "," + caseObject.Result +","+ maxEditorVersion + ",\n";
 				csv.Append(newLine);
             }
 
@@ -222,6 +226,7 @@ namespace greeningthebuild
 				newCase.MostRecentRunID = recentTest.RunID;
 				newCase.Result = recentTest.Result;
 				newCase.EditorVersion = recentTest.EditorVersion;
+				newCase.RawEditorVersion = recentTest.RawEditorVersion;
 
 				listOfCases.Add(newCase);
             }
@@ -291,7 +296,7 @@ namespace greeningthebuild
 			}
 		}
 
-		public static List<Test> CreateListOfTests(APIClient client, JArray testsArray)
+		public static List<Test> CreateListOfTests(APIClient client, JArray testsArray, string projectID)
 		{
 			JArray statusArray = GetStatuses(client);
 
@@ -300,14 +305,15 @@ namespace greeningthebuild
 			for (int i = 0; i < testsArray.Count; i++)
 			{
 				JObject arrayObject = testsArray[i].ToObject<JObject>();
-
+                
 				string testID = arrayObject.Property("id").Value.ToString();
 				string caseID = arrayObject.Property("case_id").Value.ToString();
 				string runID = arrayObject.Property("run_id").Value.ToString();
 
-				string editorVersion = "";
+				string editorVersion = "None";
 				int completedDate = 0;
-				string result = "";
+				string result = "In Progress";
+				int rawEditorVersion = 0;
 
 				JArray resultsOfLatestTest = GetLatestResultsOfTest(client, testID, "1");
 
@@ -317,7 +323,12 @@ namespace greeningthebuild
 					{
 						JObject resultObject = resultsOfLatestTest[k].ToObject<JObject>();
 
-						editorVersion = resultObject.Property("custom_editorversion").Value.ToString();
+						//if ((resultObject.Property("custom_editorversion").Value != null) || (resultObject.Property("custom_editorversion") != null) || (resultObject.Property("custom_editorversion").Value.ToString() == ""))
+						if (resultObject.Property("custom_editorversion").Value.ToString() != "")
+						{
+							rawEditorVersion = Int32.Parse(resultObject.Property("custom_editorversion").Value.ToString());
+                            editorVersion = GetEditorVersion(client, projectID, rawEditorVersion.ToString());
+						}
 						completedDate = Int32.Parse(resultObject.Property("created_on").Value.ToString());
 						string resultID = resultObject.Property("status_id").Value.ToString();
 						result = GetStatus(statusArray, resultID);
@@ -331,6 +342,7 @@ namespace greeningthebuild
 				test.Result = result;
 				test.EditorVersion = editorVersion;
 				test.CompletedOn = completedDate;
+				test.RawEditorVersion = rawEditorVersion;
 
 				tests.Add(test);
 			}
