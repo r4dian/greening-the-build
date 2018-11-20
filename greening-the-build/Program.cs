@@ -50,12 +50,14 @@ namespace greeningthebuild
 
         public static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            Console.WriteLine("HOW GREEN IS YOUR LOVE");
 			APIClient client = ConnectToTestrail();
 
 			JArray suitesArray = GetSuitesInProject(client, args[0]);
 
-			List<Case> cases = new List<Case>();
+            Console.WriteLine("Project ID: " + args[0]);
+
+            List<Case> cases = new List<Case>();
 
 			JArray runsArray = GetRuns(client, args[0]);
 
@@ -104,6 +106,7 @@ namespace greeningthebuild
 			string csv = CreateCsvOfCases(cases, maxEditorVersion, args[0]);
 
 			File.WriteAllText("Cases"+args[0]+".csv", csv.ToString());
+            Console.WriteLine("Goodbye World!");
         }
 
 		private static APIClient ConnectToTestrail()
