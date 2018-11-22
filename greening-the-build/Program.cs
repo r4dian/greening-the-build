@@ -127,6 +127,11 @@ namespace greeningthebuild
 			for (int i = 0; i < listOfCases.Count; i++)
             {
 				Case caseObject = listOfCases[i];
+
+                if (caseObject.Result == "")
+                {
+                    caseObject.Result = "In Progress";
+                }
                 
 				string newLine = caseObject.CaseID + "-" + projectID + "-" + maxEditorVersion +","+ caseObject.SuiteID + "," + "\""+ caseObject.SuiteName +"\"" + ","+ caseObject.CaseID + ","+"\"" + caseObject.CaseName + "\"" + "," + caseObject.MilestoneName + "," + caseObject.MostRecentRunID + "," + caseObject.MostRecentTestID + "," + caseObject.EditorVersion + "," + caseObject.Result +","+ maxEditorVersion + ",\n";
 				csv.Append(newLine);
