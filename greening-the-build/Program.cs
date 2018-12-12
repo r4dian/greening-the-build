@@ -121,7 +121,7 @@ namespace greeningthebuild
         {
             StringBuilder csv = new StringBuilder();
 
-			string header = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}", "Identifier", "Suite ID", "Suite Name", "Case ID", "Title", "Milestone Name", "Run ID", "Test ID", "Editor Version", "Result", "Max Editor Version", "\n");
+			string header = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13}", "Identifier", "Suite ID", "Suite Name", "Case ID", "Title", "Milestone Name", "Run ID", "Test ID", "Editor Version", "Editor Version Num", "Result", "Max Editor Version", "Max Editor Version Num", "\n");
             csv.Append(header);
             
 			for (int i = 0; i < listOfCases.Count; i++)
@@ -133,7 +133,7 @@ namespace greeningthebuild
                     caseObject.Result = "In Progress";
                 }
                 
-				string newLine = caseObject.CaseID + "-" + projectID + "-" + maxEditorVersion +","+ caseObject.SuiteID + "," + "\""+ caseObject.SuiteName +"\"" + ","+ caseObject.CaseID + ","+"\"" + caseObject.CaseName + "\"" + "," + caseObject.MilestoneName + "," + caseObject.MostRecentRunID + "," + caseObject.MostRecentTestID + "," + caseObject.EditorVersion + "," + caseObject.Result +","+ maxEditorVersion + ",\n";
+				string newLine = caseObject.CaseID + "-" + projectID + "-" + maxEditorVersion +","+ caseObject.SuiteID + "," + "\""+ caseObject.SuiteName +"\"" + ","+ caseObject.CaseID + ","+"\"" + caseObject.CaseName + "\"" + "," + caseObject.MilestoneName + "," + caseObject.MostRecentRunID + "," + caseObject.MostRecentTestID + "," + caseObject.EditorVersion + "," + GetVersionInt(caseObject.EditorVersion) +"," + caseObject.Result +","+ maxEditorVersion + "," + GetMaxVersionInt(maxEditorVersion) + ",\n";
 				csv.Append(newLine);
             }
 
@@ -426,6 +426,44 @@ namespace greeningthebuild
                 }
             }
             return "";
+        }
+
+        public static string GetVersionInt(string editorVersion)
+		{
+			string versionInt = "";
+			if (editorVersion.Contains("Alpha"))
+			{
+				versionInt = editorVersion.Replace("Alpha ", "1_");
+			}
+			else if (editorVersion.Contains("Beta"))
+			{
+				versionInt = editorVersion.Replace("Beta ", "2_");
+			}
+			else if (editorVersion.Contains("f"))
+			{
+				versionInt = editorVersion.Replace("f", "3_");
+			}
+
+			return versionInt;
+		}
+
+		public static string GetMaxVersionInt(string maxEditorVersion)
+        {
+            string versionInt = "";
+			if (maxEditorVersion.Contains("Alpha"))
+            {
+				versionInt = maxEditorVersion.Replace("Alpha ", "1_");
+            }
+			else if (maxEditorVersion.Contains("Beta"))
+            {
+				versionInt = maxEditorVersion.Replace("Beta ", "2_");
+            }
+			else if (maxEditorVersion.Contains("f"))
+            {
+				versionInt = maxEditorVersion.Replace("f", "3_");
+            }
+
+            return versionInt;
         }
 
 		public static string GetStatus(JArray statusArray, string rawValue)
