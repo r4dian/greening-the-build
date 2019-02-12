@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -50,7 +50,7 @@ namespace greeningthebuild
 
         public static void Main(string[] args)
         {
-            Console.WriteLine("HOW GREEN IS YOUR LOVE");
+			Console.WriteLine("HOW GREEN IS YOUR LOVE");
 			APIClient client = ConnectToTestrail();
 
 			JArray suitesArray = GetSuitesInProject(client, args[0]);
@@ -72,8 +72,10 @@ namespace greeningthebuild
             string projectName = projectObject.Property("name").Value.ToString();
 
 			List<Test> tests = new List<Test>();
+			int count = 0;
 			foreach (Run run in runs)
 			{
+				count++;
 				List<Test> currentTests = new List<Test>();
 
 				JArray testsArray = GetTestsInRun(client, run.RunID);
@@ -98,14 +100,14 @@ namespace greeningthebuild
 
 				List<Case> casesInSuite = CreateListOfCases(casesArray, suiteId, suiteName, milestoneString, tests);
 				cases.AddRange(casesInSuite);
-            }
+			}
 
 			Case highestCase = cases.Aggregate((i1, i2) => i1.RawEditorVersion > i2.RawEditorVersion ? i1 : i2);
 			string maxEditorVersion = highestCase.EditorVersion;
 
 			string csv = CreateCsvOfCases(cases, maxEditorVersion, args[0]);
 
-			File.WriteAllText("Cases"+args[0]+".csv", csv.ToString());
+			File.WriteAllText("Cases"+ args[0] + ".csv", csv.ToString());
             Console.WriteLine("Goodbye World!");
         }
 
@@ -247,7 +249,11 @@ namespace greeningthebuild
 				newCase.MostRecentRunID = recentTest.RunID;
 				newCase.Result = recentTest.Result;
 				newCase.EditorVersion = recentTest.EditorVersion;
-				newCase.RawEditorVersion = recentTest.RawEditorVersion;
+
+				if (recentTest.EditorVersion.Contains("None"))
+					newCase.RawEditorVersion = 00;
+				else
+					newCase.RawEditorVersion = int.Parse(GetRawEditorVersionInt(recentTest.EditorVersion));
 
 				listOfCases.Add(newCase);
             }
@@ -442,6 +448,34 @@ namespace greeningthebuild
 			else if (editorVersion.Contains("f"))
 			{
 				versionInt = editorVersion.Replace("f", "3_");
+			}
+
+			return versionInt;
+		}
+
+		public static string GetRawEditorVersionInt(string editorVersion)
+		{
+			string versionInt = "";
+			
+			if (editorVersion.Contains("Alpha"))
+			{
+				string[] versionStr = editorVersion.Split(' ');
+				versionInt = versionStr[1].Length > 1 ? "1" + versionStr[1] : "10" + versionStr[1];
+			}
+			else if (editorVersion.Contains("Beta"))
+			{
+				string[] versionStr = editorVersion.Split(' ');
+				versionInt = versionStr[1].Length > 1 ? "2" + versionStr[1] : "20" + versionStr[1];
+			}
+			else if (editorVersion.Contains("f"))
+			{
+				versionInt = editorVersion.Replace("f", "");
+				versionInt = versionInt.Length > 1 ? "3" + versionInt : "30" + versionInt;
+			}
+			else if (editorVersion.Contains("RC"))
+			{
+				versionInt = editorVersion.Replace("RC", "");
+				versionInt = versionInt.Length > 1 ? "3" + versionInt : "30" + versionInt;
 			}
 
 			return versionInt;
